@@ -26,44 +26,45 @@ func main() {
 	sum := 0
 
 	operators := strings.Fields(line[:len(line)-1])
-	columnLines := 0
 
-	for i := range operators {
-		numbers := []int{}
+	indexOperators := 0
+	numbers := []int{}
 
-		for {
-			if columnLines >= len(lines[0]) {
-				break
-			}
+	for columnLines := range lines[0] {
+		newNumber := 0
 
-			newNumber := 0
-			for rowLines := range lines {
-				if lines[rowLines][columnLines] != ' ' {
-					newNumber *= 10
-					newNumber += int(lines[rowLines][columnLines] - '0')
-				}
-			}
-
-			columnLines++
-
-			if newNumber != 0 {
-				numbers = append(numbers, newNumber)
-			} else {
-				break
+		for rowLines := range lines {
+			if lines[rowLines][columnLines] != ' ' {
+				newNumber *= 10
+				newNumber += int(lines[rowLines][columnLines] - '0')
 			}
 		}
 
-		switch operators[i] {
-		case "+":
-			sum += addAll(numbers)
-		case "*":
-			sum += multAll(numbers)
-		default:
-			panic("Unknown operator in last line")
+		if newNumber != 0 {
+			numbers = append(numbers, newNumber)
+		} else {
+			sum += applyOperator(operators[indexOperators], numbers)
+
+			indexOperators++
+			numbers = nil
 		}
 	}
 
+	sum += applyOperator(operators[indexOperators], numbers)
+
 	println("sum:", sum)
+}
+
+func applyOperator(operator string, numbers []int) int {
+	switch operator {
+	case "+":
+		return addAll(numbers)
+	case "*":
+		return multAll(numbers)
+	default:
+		panic("Unknown operator in last line")
+	}
+
 }
 
 func addAll(numbers []int) int {
