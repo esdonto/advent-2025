@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"math"
 	"os"
 	"slices"
 	"strconv"
@@ -16,11 +15,18 @@ type JunctionBox struct {
 	z int
 }
 
-func (b1 *JunctionBox) distanceTo(b2 *JunctionBox) float64 {
+// Distance squared
+func (b1 *JunctionBox) distanceTo(b2 *JunctionBox) int {
 	dX := b1.x - b2.x
 	dY := b1.y - b2.y
 	dZ := b1.z - b2.z
-	return math.Sqrt(float64(dX*dX + dY*dY + dZ*dZ))
+	return dX*dX + dY*dY + dZ*dZ
+}
+
+type JunctionDistance struct {
+	distance  int
+	indexBox1 int
+	indexBox2 int
 }
 
 func main() {
@@ -35,7 +41,7 @@ func main() {
 	line, err := reader.ReadString('\n')
 
 	boxes := []JunctionBox{}
-	distacesMatrix := [][]float64{}
+	distances := []JunctionDistance{}
 
 	for ; err == nil; line, err = reader.ReadString('\n') {
 		lineSeparated := strings.Split(line[:len(line)-1], ",")
@@ -46,54 +52,37 @@ func main() {
 
 		newBox := JunctionBox{newX, newY, newZ}
 
-		newRow := make([]float64, len(boxes)+1)
 		for i := range boxes {
-			newDist := newBox.distanceTo(&boxes[i])
-			newRow[i] = newDist
+			distances = append(distances, JunctionDistance{
+				distance:  newBox.distanceTo(&boxes[i]),
+				indexBox1: i,
+				indexBox2: len(boxes),
+			})
 		}
-
-		for i := range distacesMatrix {
-			distacesMatrix[i] = append(distacesMatrix[i], newRow[i])
-		}
-		distacesMatrix = append(distacesMatrix, newRow)
 
 		boxes = append(boxes, newBox)
 	}
+
+	slices.SortFunc(distances, func(a, b JunctionDistance) int {
+		return a.distance - b.distance
+	})
 
 	circuits := make([]int, len(boxes))
 	for i := range circuits {
 		circuits[i] = i
 	}
 
-	var previousDist float64 = 0
-	for range 1000 {
-		var minI, minJ int
-		var minDistance float64 = -1
-
-		// Going throught the matrix
-		for i := range distacesMatrix {
-			for j := range i {
-				if distacesMatrix[i][j] > previousDist && (minDistance < 0 || minDistance > distacesMatrix[i][j]) {
-					minI = i
-					minJ = j
-					minDistance = distacesMatrix[i][j]
-				}
-			}
-		}
-
-		circuitFusing := circuits[minI]
-		circuitFused := circuits[minJ]
+	for i := range 1000 {
+		circuitFusing := circuits[distances[i].indexBox1]
+		circuitFused := circuits[distances[i].indexBox2]
 
 		if circuitFused != circuitFusing {
-			for i := range circuits {
-				if circuits[i] == circuitFused {
-					circuits[i] = circuitFusing
+			for j := range circuits {
+				if circuits[j] == circuitFused {
+					circuits[j] = circuitFusing
 				}
 			}
 		}
-
-		previousDist = minDistance
-		minDistance = -1
 	}
 
 	lenCircuits := []int{}
@@ -113,10 +102,6 @@ func main() {
 	slices.SortFunc(lenCircuits, func(a, b int) int {
 		return b - a
 	})
-
-	for _, v := range circuits {
-		print(v, "-")
-	}
 
 	println(lenCircuits[0] * lenCircuits[1] * lenCircuits[2])
 }
