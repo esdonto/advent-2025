@@ -3,10 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"iter"
 	"os"
 	"strconv"
 	"strings"
 )
+
+// Based on the "Bifurcate your way to victory" by u/tenthmascot solution on https://reddit.com/r/adventofcode/comments/1pk87hl/2025_day_10_part_2_bifurcate_your_way_to_victory/
 
 func main() {
 	file, err := os.Open("input.txt")
@@ -27,83 +30,96 @@ func main() {
 		buttons := parseButtons(lineSeparated[1 : len(lineSeparated)-1])
 		joltage := parseJoltage(lineSeparated[len(lineSeparated)-1])
 
-		//sumButtons += getMinButtonPresses(buttons, joltage)
+		found, minButtons := evaluateAllCombinations(joltage, buttons)
 
-		print(getMinButtonPresses(buttons, joltage))
+		if !found {
+			fmt.Println("No possible button presses found!")
+			panic("")
+		}
+
+		sumButtons += minButtons
 	}
 
 	println(sumButtons)
 }
 
-func getMinButtonPresses(buttons [][]int, joltageTarget []int) int {
-	bufferPresses := make([]int, len(buttons))
+func iterateCombinations(nButtons int) iter.Seq[[]bool] {
+	pressed := make([]bool, nButtons)
+	return func(yield func([]bool) bool) {
+		if !yield(pressed) {
+			return
+		}
+		for binaryAddOne(nButtons, pressed) {
+			if !yield(pressed) {
+				return
+			}
+		}
+	}
+}
 
+// Returns if it has found a possible combination and the amount of presses of the minimal one
+func evaluateAllCombinations(joltageTarget []int, buttons [][]int) (bool, int) {
+	//fmt.Println(joltageTarget)
+	if allZeroes(joltageTarget) {
+		return true, 0
+	}
+
+	firstFound := false
 	var minPresses int
-	//foundFirst := false
-	increaseIdx := 0
-	for {
-		//fmt.Println(bufferPresses)
-		exactMatch, surpassesTarget := evaluateCombination(joltageTarget, buttons, bufferPresses)
-		if exactMatch {
-			nPresses := sumPresses(bufferPresses)
-			println(nPresses)
-		}
-		// Kind of a base-m +1 algorithm
-		if exactMatch || surpassesTarget {
-			if increaseIdx == len(bufferPresses)-1 {
-				// End of the line, all possible combinations have been checked
-				break
-			}
 
-			bufferPresses[increaseIdx] = 0
-			increaseIdx++
-		} else {
-			increaseIdx = 0
-		}
-		bufferPresses[increaseIdx]++
-		/*if exactMatch {
-			nPresses := sumPresses(bufferPresses)
-			if !foundFirst || minPresses < nPresses {
-				minPresses = nPresses
+	for pressed := range iterateCombinations(len(buttons)) {
+		isValid, newJoltageTarget := evaluateCombination(joltageTarget, buttons, pressed)
+		if isValid {
+			found, nPresses := evaluateAllCombinations(divideJoltages(newJoltageTarget), buttons)
+			if found {
+				totalPresses := 2*nPresses + sumPresses(pressed)
+				if !firstFound || minPresses > totalPresses {
+					minPresses = totalPresses
+					firstFound = true
+				}
 			}
-		} else {
-
-		}*/
+		}
 	}
-	return minPresses
+
+	if !firstFound {
+		return false, 0
+	}
+
+	return true, minPresses
 }
 
-func sumPresses(buttonsPressed []int) int {
-	sum := 0
-	for _, v := range buttonsPressed {
-		sum += v
-	}
-	return sum
-}
-
-// 1st bool evaluates if the combination gets the exact target
-// 2nd bool evaluates if the combination meets the target
-func evaluateCombination(joltageTarget []int, buttons [][]int, buttonsPressed []int) (bool, bool) {
+// Returns if the result of the button combination subtratcion results in a valid joltage read (i.e. all evens and >0) and the result of the subtraction
+func evaluateCombination(joltageTarget []int, buttons [][]int, buttonsPressed []bool) (bool, []int) {
 	joltages := make([]int, len(joltageTarget))
+	copy(joltages, joltageTarget)
 
 	for i := range buttonsPressed {
-		for _, v := range buttons[i] {
-			joltages[v] += buttonsPressed[i]
-		}
-	}
-
-	exactMatch := true
-
-	for i := range joltages {
-		if joltages[i] != joltageTarget[i] {
-			exactMatch = false
-			if joltages[i] > joltageTarget[i] {
-				return false, true
+		if buttonsPressed[i] {
+			for _, v := range buttons[i] {
+				joltages[v] -= 1
 			}
 		}
 	}
 
-	return exactMatch, false
+	for _, v := range joltages {
+		if v < 0 || v%2 > 0 {
+			return false, []int{}
+		}
+	}
+
+	return true, joltages
+}
+
+func parseLights(lightsString string) []bool {
+	lightsBool := make([]bool, len(lightsString)-2)
+
+	for i := range lightsBool {
+		if lightsString[i+1] == '#' {
+			lightsBool[i] = true
+		}
+	}
+
+	return lightsBool
 }
 
 func parseButtons(buttonsString []string) [][]int {
@@ -138,4 +154,39 @@ func parseJoltage(joltageString string) []int {
 	}
 
 	return joltageInt
+}
+
+// Returns false if it has reached the end of the line
+func binaryAddOne(nButtons int, buttons []bool) bool {
+	for i := range nButtons {
+		buttons[i] = !buttons[i]
+		if buttons[i] {
+			return true
+		}
+	}
+	return false
+}
+
+func sumPresses(buttons []bool) int {
+	sum := 0
+	for _, v := range buttons {
+		if v {
+			sum++
+		}
+	}
+	return sum
+}
+func allZeroes(joltages []int) bool {
+	for _, v := range joltages {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+func divideJoltages(joltages []int) []int {
+	for i := range joltages {
+		joltages[i] /= 2
+	}
+	return joltages
 }
