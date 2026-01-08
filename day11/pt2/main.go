@@ -4,11 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 )
 
-// THIS ISNT A GRAPH, ITS A TREE!!!
+// THERES NO LOOPBACK!!!
 
 func main() {
 	file, err := os.Open("input.txt")
@@ -35,126 +34,36 @@ func main() {
 	for nodeName := range connections {
 		for _, connectedNode := range connections[nodeName] {
 			nodes[nodeName].output = append(nodes[nodeName].output, nodes[connectedNode])
-			nodes[connectedNode].input = append(nodes[connectedNode].input, nodes[nodeName])
 		}
 	}
 
-	checkReachability(nodes["fft"], nodes["dac"])
+	svrTOfft := findPaths(nodes["svr"], nodes["fft"], map[*Node]int{})
+	svrTOdac := findPaths(nodes["svr"], nodes["dac"], map[*Node]int{})
+	fftTOdac := findPaths(nodes["fft"], nodes["dac"], map[*Node]int{})
+	dacTOfft := findPaths(nodes["dac"], nodes["fft"], map[*Node]int{})
+	fftTOout := findPaths(nodes["fft"], nodes["out"], map[*Node]int{})
+	dacTOout := findPaths(nodes["dac"], nodes["out"], map[*Node]int{})
 
-	svt_to_fft := 0
-	pathsFIFO := [][]*Node{{nodes["svr"]}}
-
-	for len(pathsFIFO) > 0 {
-		currentPath := pathsFIFO[len(pathsFIFO)-1]
-		pathsFIFO = pathsFIFO[:len(pathsFIFO)-1]
-
-		//println(len(pathsFIFO), len(currentPath))
-		//printPath(currentPath)
-
-		for _, nextNode := range currentPath[len(currentPath)-1].output {
-			if nextNode.name == "fft" || nextNode.name == "dac" || nextNode.name == "out" {
-				svt_to_fft++
-				//println(svt_to_fft)
-			} else {
-				alreadyInPath := slices.Contains(currentPath, nextNode)
-				if alreadyInPath {
-					println("oi")
-				}
-				if !alreadyInPath {
-					newPath := make([]*Node, len(currentPath))
-					copy(newPath, currentPath)
-					newPath = append(newPath, nextNode)
-					pathsFIFO = append(pathsFIFO, newPath)
-				}
-			}
-		}
-	}
+	println((svrTOfft * fftTOdac * dacTOout) + (svrTOdac * dacTOfft * fftTOout))
 }
 
-func checkReachability(fft, dac *Node) {
-	FIFO := []*Node{fft}
-	for len(FIFO) > 0 {
-		currentNode := FIFO[len(FIFO)-1]
-		FIFO = FIFO[:len(FIFO)-1]
-
-		currentNode.fromFFT = true
-
-		for _, nextNode := range currentNode.output {
-			if !nextNode.fromFFT {
-				FIFO = append(FIFO, nextNode)
-			}
-		}
+func findPaths(node *Node, target *Node, cache map[*Node]int) int {
+	if node == target {
+		return 1
+	}
+	if value, ok := cache[node]; ok {
+		return value
 	}
 
-	FIFO = []*Node{fft}
-	for len(FIFO) > 0 {
-		currentNode := FIFO[len(FIFO)-1]
-		FIFO = FIFO[:len(FIFO)-1]
-
-		currentNode.toFFT = true
-
-		for _, nextNode := range currentNode.input {
-			if !nextNode.toFFT {
-				FIFO = append(FIFO, nextNode)
-			}
-		}
+	sum := 0
+	for _, nextNode := range node.output {
+		sum += findPaths(nextNode, target, cache)
 	}
-
-	FIFO = []*Node{dac}
-	for len(FIFO) > 0 {
-		currentNode := FIFO[len(FIFO)-1]
-		FIFO = FIFO[:len(FIFO)-1]
-
-		currentNode.fromDAC = true
-
-		for _, nextNode := range currentNode.output {
-			if !nextNode.fromDAC {
-				FIFO = append(FIFO, nextNode)
-			}
-		}
-	}
-
-	FIFO = []*Node{dac}
-	for len(FIFO) > 0 {
-		currentNode := FIFO[len(FIFO)-1]
-		FIFO = FIFO[:len(FIFO)-1]
-
-		currentNode.toDAC = true
-
-		for _, nextNode := range currentNode.input {
-			if !nextNode.toDAC {
-				FIFO = append(FIFO, nextNode)
-			}
-		}
-	}
+	cache[node] = sum
+	return sum
 }
 
 type Node struct {
-	name    string
-	output  []*Node
-	input   []*Node
-	fromFFT bool //FFT output reaches it
-	toFFT   bool //Its output can reachs FFT
-	fromDAC bool //DAC output reaches it
-	toDAC   bool //Its output can reachs DAC
-}
-
-func printPath(path []*Node) {
-	print("path: [ ")
-	for _, node := range path {
-		print(node.name, " ")
-	}
-	println("]")
-}
-
-func printFIFO(fifo [][]*Node) {
-	print("fifo: [ ")
-	for _, path := range fifo {
-		print("[ ")
-		for _, node := range path {
-			print(node.name, " ")
-		}
-		print("] ")
-	}
-	println("]")
+	name   string
+	output []*Node
 }
